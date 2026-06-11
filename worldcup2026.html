@@ -269,6 +269,7 @@ const KO_STAGES = [
 // ===================== DATA =====================
 async function loadData(force) {
   if (cachedData && !force) return cachedData;
+  cachedData = null;
   try {
     const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
       headers: { 'X-Master-Key': API_KEY }
@@ -446,22 +447,22 @@ function checkPassword() {
 }
 
 // ===================== PREDICT =====================
-function renderPredictTabs() {
+async function renderPredictTabs() {
   const tabs = document.getElementById('predict-stage-tabs');
   const stages = [{key:'group',label:'Group stage'}, ...KO_STAGES];
   tabs.innerHTML = stages.map(s =>
     `<button class="stage-tab ${currentPredictStage===s.key?'active':''}" onclick="setPredictStage('${s.key}')">${s.label}</button>`
   ).join('');
-  renderMatches();
+  await renderMatches();
 }
 
-function setPredictStage(s) {
+async function setPredictStage(s) {
   currentPredictStage = s;
-  renderPredictTabs();
+  await renderPredictTabs();
 }
 
 async function renderMatches() {
-  const data = await loadData();
+  const data = await loadData(true);
   const nameEl = document.getElementById('player-name');
   const name = nameEl ? nameEl.value.trim() : (localStorage.getItem('wc_player_name')||'');
   const myPreds = name ? (data.predictions[name]||{}) : {};
@@ -748,8 +749,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (ni && savedName) {
     ni.value = savedName;
   }
-  // Render tabs and matches — if name is saved, predictions will load automatically
-  renderPredictTabs();
+  // Force fresh data load then render
+  cachedData = null;
+  await renderPredictTabs();
   if (ni) {
     ni.addEventListener('blur', () => {
       localStorage.setItem('wc_player_name', ni.value.trim());
