@@ -86,7 +86,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 <body>
 
 <div class="hero">
-  <div class="hero-badge">Applied AI · Team Challenge</div>
+  <div class="hero-badge">AppliedAI · Team Challenge</div>
   <h1>World Cup <span>2026</span></h1>
   <p>Predict every match. Top the leaderboard. Glory awaits.</p>
 </div>
@@ -228,28 +228,14 @@ const MATCHES = [
   {id:72,group:"Group C",home:"Morocco",away:"Haiti",hf:"🇲🇦",af:"🇭🇹",date:"Jun 24"},
 ];
 
-let BIN_ID = localStorage.getItem('wc_bin_id') || '';
-let API_KEY = localStorage.getItem('wc_api_key') || '';
+const BIN_ID = '6a2ab03ef5f4af5e29dee9c1';
+const API_KEY = '$2a$10$jOjRvwIbb/IUPiJO682QUuK.a2dgvdVuzbvmJA2If0zVa6MKD4aN.';
 let cachedData = null;
 
 function init() {
-  if (BIN_ID && API_KEY) {
-    document.getElementById('setup-section').style.display = 'none';
-    document.getElementById('predict-main').style.display = 'block';
-    renderMatches();
-  } else {
-    document.getElementById('setup-section').style.display = 'block';
-    document.getElementById('predict-main').style.display = 'none';
-  }
-}
-
-function saveConfig() {
-  BIN_ID = document.getElementById('bin-id-input').value.trim();
-  API_KEY = document.getElementById('api-key-input').value.trim();
-  if (!BIN_ID || !API_KEY) { showToast('Enter both fields!', true); return; }
-  localStorage.setItem('wc_bin_id', BIN_ID);
-  localStorage.setItem('wc_api_key', API_KEY);
-  init();
+  document.getElementById('setup-section').style.display = 'none';
+  document.getElementById('predict-main').style.display = 'block';
+  renderMatches();
 }
 
 async function loadData(force) {
