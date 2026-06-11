@@ -563,8 +563,9 @@ async function submitPredictions() {
   }
   await saveData(data);
   btn.disabled = false; btn.textContent = 'Save predictions';
-  showToast('Predictions saved!');
-  renderMatches();
+  showToast('Predictions saved! ✓');
+  cachedData = null;
+  await renderMatches();
 }
 
 // ===================== STANDINGS =====================
@@ -740,9 +741,19 @@ function advanceWinner(data, id, winner, home, away) {
 
 // ===================== INIT =====================
 document.addEventListener('DOMContentLoaded', () => {
-  renderPredictTabs();
+  // Restore saved name
+  const savedName = localStorage.getItem('wc_player_name');
   const ni = document.getElementById('player-name');
-  if (ni) ni.addEventListener('blur', renderMatches);
+  if (ni && savedName) {
+    ni.value = savedName;
+  }
+  renderPredictTabs();
+  if (ni) {
+    ni.addEventListener('blur', () => {
+      localStorage.setItem('wc_player_name', ni.value.trim());
+      renderMatches();
+    });
+  }
   if (typeof twemoji !== 'undefined') twemoji.parse(document.body);
 });
 </script>
