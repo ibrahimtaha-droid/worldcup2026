@@ -462,8 +462,9 @@ function setPredictStage(s) {
 
 async function renderMatches() {
   const data = await loadData();
-  const name = (document.getElementById('player-name')||{}).value||'';
-  const myPreds = name.trim() ? (data.predictions[name.trim()]||{}) : {};
+  const nameEl = document.getElementById('player-name');
+  const name = nameEl ? nameEl.value.trim() : (localStorage.getItem('wc_player_name')||'');
+  const myPreds = name ? (data.predictions[name]||{}) : {};
   const results = data.results||{};
   const container = document.getElementById('matches-list');
   if (!container) return;
@@ -740,13 +741,14 @@ function advanceWinner(data, id, winner, home, away) {
 }
 
 // ===================== INIT =====================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   // Restore saved name
   const savedName = localStorage.getItem('wc_player_name');
   const ni = document.getElementById('player-name');
   if (ni && savedName) {
     ni.value = savedName;
   }
+  // Render tabs and matches — if name is saved, predictions will load automatically
   renderPredictTabs();
   if (ni) {
     ni.addEventListener('blur', () => {
