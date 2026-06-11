@@ -462,9 +462,16 @@ async function setPredictStage(s) {
 }
 
 async function renderMatches() {
+  const container = document.getElementById('matches-list');
+  if (container) container.innerHTML = '<div class="loading"><span class="spinner"></span>Loading your predictions...</div>';
+  
   const data = await loadData(true);
   const nameEl = document.getElementById('player-name');
   const name = nameEl ? nameEl.value.trim() : (localStorage.getItem('wc_player_name')||'');
+  if (!name) {
+    if (container) container.innerHTML = '<div class="empty">Enter your name above to see predictions</div>';
+    return;
+  }
   const myPreds = name ? (data.predictions[name]||{}) : {};
   const results = data.results||{};
   const container = document.getElementById('matches-list');
