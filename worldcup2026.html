@@ -269,28 +269,57 @@ const KO_STAGES = [
 // ===================== DATA =====================
 async function loadData(force) {
   if (cachedData && !force) return cachedData;
-  cachedData = null;
   try {
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
-      headers: { 'X-Master-Key': API_KEY }
-    });
+    const res = await fetch(`${FIREBASE_URL}/data.json`);
+    if (!res.ok) throw new Error('Failed to load');
     const json = await res.json();
-    cachedData = json.record;
+    cachedData = json || { predictions:{}, results:{}, ko:{}, koResults:{} };
     if (!cachedData.predictions) cachedData.predictions = {};
     if (!cachedData.results) cachedData.results = {};
     if (!cachedData.ko) cachedData.ko = {};
     if (!cachedData.koResults) cachedData.koResults = {};
     return cachedData;
-  } catch(e) { showToast('Connection error', true); return { predictions:{}, results:{}, ko:{}, koResults:{} }; }
+  } catch(e) {
+    showToast('Connection error — please try again', true);
+    return cachedData || { predictions:{}, results:{}, ko:{}, koResults:{} };
+  }
+}
+
+async function savePatch(path, value) {
+  // Firebase PATCH only updates specific path — no race condition!
+  try {
+    const res = await fetch(`${FIREBASE_URL}/${path}.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(value)
+    });
+    if (!res.ok) throw new Error('Save failed');
+    return true;
+  } catch(e) {
+    showToast('Save error — please try again', true);
+    return false;
+  }
 }
 
 async function saveData(data) {
-  cachedData = data;
-  await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
-    body: JSON.stringify(data)
-  });
+  // Full save — used for ko bracket generation and result saves
+  if (!data || !data.predictions) {
+    showToast('Save failed — invalid data', true);
+    return false;
+  }
+  try {
+    const res = await fetch(`${FIREBASE_URL}/data.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (res.ok) { cachedData = data; return true; }
+    showToast('Save failed — please try again', true);
+    return false;
+  } catch(e) {
+    showToast('Save error — please try again', true);
+    return false;
+  }
 }
 
 // ===================== STANDINGS =====================
@@ -480,7 +509,7 @@ async function renderMatches() {
     let html = ''; let currentGroup = '';
     GROUP_MATCHES.forEach(m => {
       if (m.group !== currentGroup) { currentGroup = m.group; html += `<div class="section-label">${m.group}</div>`; }
-      const pred = myPreds[m.id]||{}, res = results[m.id];
+      const pred = myPreds[m.id] ? {h: Number(myPreds[m.id].h), a: Number(myPreds[m.id].a)} : {}, res = results[m.id];
       let pickHtml = '';
       if (pred.h !== undefined && pred.a !== undefined) {
         let cls = '', note = `Your pick: ${pred.h}–${pred.a}`;
@@ -497,9 +526,9 @@ async function renderMatches() {
           <div class="team-side"><div class="flag">${m.hf}</div><div class="team-name">${m.home}</div></div>
           <div class="score-wrap">
             <div class="score-inputs">
-              <input type="number" min="0" max="20" id="h${m.id}" placeholder="0" value="${pred.h!==undefined?pred.h:''}" ${res||isLocked(m)?'disabled':''}>
+              <input type="number" min="0" max="20" id="h${m.id}" placeholder="0" value="${pred.h!==undefined && pred.h!==null && !isNaN(pred.h)?pred.h:''}" ${res||isLocked(m)?'disabled':''}>
               <span class="score-sep">–</span>
-              <input type="number" min="0" max="20" id="a${m.id}" placeholder="0" value="${pred.a!==undefined?pred.a:''}" ${res||isLocked(m)?'disabled':''}>
+              <input type="number" min="0" max="20" id="a${m.id}" placeholder="0" value="${pred.a!==undefined && pred.a!==null && !isNaN(pred.a)?pred.a:''}" ${res||isLocked(m)?'disabled':''}>
             </div>${pickHtml}
           </div>
           <div class="team-side"><div class="flag">${m.af}</div><div class="team-name">${m.away}</div></div>
@@ -555,11 +584,17 @@ async function submitPredictions() {
   const data = await loadData(true);
   if (!data.predictions[name]) data.predictions[name] = {};
   if (currentPredictStage === 'group') {
+    const updates = {};
     GROUP_MATCHES.forEach(m => {
       const h = parseInt(document.getElementById('h'+m.id).value);
       const a = parseInt(document.getElementById('a'+m.id).value);
-      if (!isNaN(h) && !isNaN(a)) data.predictions[name][m.id] = {h,a};
+      if (!isNaN(h) && !isNaN(a)) {
+        updates[m.id] = {h,a};
+        data.predictions[name][m.id] = {h,a};
+      }
     });
+    // Save only this player's predictions — no race condition!
+    await savePatch(`data/predictions/${encodeURIComponent(name)}`, data.predictions[name]);
   } else {
     const ko = data.ko||{};
     const koMatches = ko[currentPredictStage]||[];
@@ -568,8 +603,9 @@ async function submitPredictions() {
       const sel = document.getElementById('ko_'+m.id);
       if (sel && sel.value) data.predictions[name].ko[m.id] = sel.value;
     });
+    await savePatch(`data/predictions/${encodeURIComponent(name)}/ko`, data.predictions[name].ko);
   }
-  await saveData(data);
+  cachedData = null;
   btn.disabled = false; btn.textContent = 'Save predictions';
   showToast('Predictions saved! ✓');
   cachedData = null;
@@ -701,10 +737,8 @@ async function saveResult(id) {
   const h = parseInt(document.getElementById('rh'+id).value);
   const a = parseInt(document.getElementById('ra'+id).value);
   if (isNaN(h)||isNaN(a)) { showToast('Enter valid scores', true); return; }
-  const data = await loadData(true);
-  data.results[id] = {h,a};
-  cachedData = null;
-  await saveData(data);
+  await savePatch(`data/results/${id}`, {h,a});
+  if (cachedData && cachedData.results) cachedData.results[id] = {h,a};
   document.getElementById('saved'+id).style.display='inline';
   setTimeout(() => document.getElementById('saved'+id).style.display='none', 2500);
   showToast('Result saved!');
@@ -716,10 +750,7 @@ async function saveKOResult(id, home, away) {
   const data = await loadData(true);
   if (!data.koResults) data.koResults = {};
   data.koResults[id] = sel.value;
-
-  // Auto-advance winner to next round
   advanceWinner(data, id, sel.value, home, away);
-
   cachedData = null;
   await saveData(data);
   document.getElementById('kosaved_'+id).style.display='inline';
