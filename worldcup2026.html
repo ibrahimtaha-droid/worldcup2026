@@ -265,6 +265,26 @@ const KO_STAGES = [
   { key:'final', label:'Final & 3rd place', date:'Jul 18–19', matches:2 },
 ];
 
+// R32 matches with Abu Dhabi kick-off times (ET + 8 hours)
+const R32_MATCHES = [
+  {id:'r32_1', home:'South Africa', away:'Canada', date:'Jun 28', ko:'2026-06-28T23:00:00+04:00'},
+  {id:'r32_2', home:'Brazil', away:'Japan', date:'Jun 29', ko:'2026-06-29T21:00:00+04:00'},
+  {id:'r32_3', home:'Germany', away:'Paraguay', date:'Jun 29', ko:'2026-06-30T00:30:00+04:00'},
+  {id:'r32_4', home:'Netherlands', away:'Morocco', date:'Jun 30', ko:'2026-06-30T05:00:00+04:00'},
+  {id:'r32_5', home:"Côte d'Ivoire", away:'Norway', date:'Jun 30', ko:'2026-06-30T21:00:00+04:00'},
+  {id:'r32_6', home:'France', away:'Sweden', date:'Jul 1', ko:'2026-07-01T01:00:00+04:00'},
+  {id:'r32_7', home:'Mexico', away:'Ecuador', date:'Jul 1', ko:'2026-07-01T05:00:00+04:00'},
+  {id:'r32_8', home:'England', away:'DR Congo', date:'Jul 1', ko:'2026-07-01T20:00:00+04:00'},
+  {id:'r32_9', home:'Belgium', away:'Senegal', date:'Jul 2', ko:'2026-07-02T01:00:00+04:00'},
+  {id:'r32_10', home:'USA', away:'Bosnia & Herzegovina', date:'Jul 2', ko:'2026-07-02T04:00:00+04:00'},
+  {id:'r32_11', home:'Spain', away:'Austria', date:'Jul 2', ko:'2026-07-02T23:00:00+04:00'},
+  {id:'r32_12', home:'Portugal', away:'Croatia', date:'Jul 3', ko:'2026-07-03T03:00:00+04:00'},
+  {id:'r32_13', home:'Switzerland', away:'Algeria', date:'Jul 3', ko:'2026-07-03T07:00:00+04:00'},
+  {id:'r32_14', home:'Australia', away:'Egypt', date:'Jul 3', ko:'2026-07-03T22:00:00+04:00'},
+  {id:'r32_15', home:'Argentina', away:'Cape Verde', date:'Jul 4', ko:'2026-07-04T04:00:00+04:00'},
+  {id:'r32_16', home:'Colombia', away:'Ghana', date:'Jul 4', ko:'2026-07-04T05:30:00+04:00'},
+];
+
 // ===================== DATA =====================
 async function loadData(force) {
   if (cachedData && !force) return cachedData;
@@ -433,8 +453,8 @@ function calcPoints(preds, results, koData, koPredictions) {
     Object.keys(koRes).forEach(mid => {
       const r = koRes[mid], p = koPredictions[mid];
       if (!p || r === undefined) return;
-      if (p === r) { pts += 5; koCorrect++; }
-      else pts += 0;
+      if (p.h === r.h && p.a === r.a) { pts += 5; koCorrect++; }
+      else if ((p.h>p.a&&r.h>r.a)||(p.h<p.a&&r.h<r.a)||(p.h===p.a&&r.h===r.a)) { pts += 2; }
     });
   }
   return { pts, exact, koCorrect };
@@ -536,34 +556,39 @@ async function renderMatches() {
     });
     container.innerHTML = html;
   } else {
-    const ko = data.ko||{};
-    const koMatches = ko[currentPredictStage]||[];
+    // For R32 use hardcoded matches, for later rounds use bracket from Firebase
+    const koMatches = currentPredictStage === 'r32' ? R32_MATCHES : (data.ko||{})[currentPredictStage]||[];
     const koResults = data.koResults||{};
     const myKoPreds = myPreds.ko||{};
-    if (!koMatches.length) { container.innerHTML = '<div class="empty">Bracket not yet generated. Group stage must complete first.</div>'; return; }
+    if (!koMatches.length) { container.innerHTML = '<div class="empty">Bracket not yet available.</div>'; return; }
     let html = '';
     koMatches.forEach(m => {
       const isTbd = m.home==='TBD'||m.away==='TBD';
       const res = koResults[m.id];
       const myPick = myKoPreds[m.id];
+      const locked = isLocked(m);
       let pickHtml = '';
-      if (myPick && res) {
-        pickHtml = myPick===res ? '<div class="my-pick correct">✓ Correct! +2pts</div>' : '<div class="my-pick wrong">✗ Wrong</div>';
-      } else if (myPick) {
-        pickHtml = `<div class="my-pick">Your pick: ${myPick}</div>`;
+      if (myPick && myPick.h !== undefined) {
+        let cls = '', note = `Your pick: ${myPick.h}–${myPick.a}`;
+        if (res) {
+          if (myPick.h===res.h && myPick.a===res.a) { cls='correct'; note+=' ✓ exact!'; }
+          else if ((myPick.h>myPick.a&&res.h>res.a)||(myPick.h<myPick.a&&res.h<res.a)||(myPick.h===myPick.a&&res.h===res.a)) { cls='partial'; note+=' ~ winner correct'; }
+          else { cls='wrong'; note+=' ✗'; }
+        }
+        pickHtml = `<div class="my-pick ${cls}">${note}</div>`;
       }
       if (m.label) html += `<div class="section-label">${m.label}</div>`;
       html += `<div class="card">
-        <div class="match-meta"><span>${m.date}</span>${isTbd?'<span class="tbd-badge">Awaiting bracket</span>':res?`<span class="result-badge">Winner: ${res}</span>`:'<span>Pick the winner</span>'}</div>
+        <div class="match-meta"><span>${m.date}</span>${res?`<span class="result-badge">Result: ${res.h}–${res.a}</span>`:locked?'<span style="color:var(--red);font-size:11px">🔒 Locked</span>':`<span>KO: ${fmtKO(m.ko)}</span>`}</div>
         ${isTbd ? `<div class="bracket-match"><div class="tbd-team">TBD</div><div style="color:var(--text3);font-size:13px">vs</div><div class="tbd-team">TBD</div></div>` :
         `<div class="match-grid">
           <div class="team-side"><div class="team-name" style="font-size:14px">${m.home}</div></div>
           <div class="score-wrap">
-            <select id="ko_${m.id}" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:6px 10px;color:var(--text);font-size:13px;outline:none" ${res?'disabled':''}>
-              <option value="">Pick winner</option>
-              <option value="${m.home}" ${myPick===m.home?'selected':''}>${m.home}</option>
-              <option value="${m.away}" ${myPick===m.away?'selected':''}>${m.away}</option>
-            </select>
+            <div class="score-inputs">
+              <input type="number" min="0" max="20" id="koh${m.id}" placeholder="0" value="${myPick&&myPick.h!==undefined?myPick.h:''}" ${res||locked?'disabled':''}>
+              <span class="score-sep">–</span>
+              <input type="number" min="0" max="20" id="koa${m.id}" placeholder="0" value="${myPick&&myPick.a!==undefined?myPick.a:''}" ${res||locked?'disabled':''}>
+            </div>
             ${pickHtml}
           </div>
           <div class="team-side"><div class="team-name" style="font-size:14px">${m.away}</div></div>
@@ -595,12 +620,12 @@ async function submitPredictions() {
     // Save only this player's predictions — no race condition!
     await savePatch(`data/predictions/${encodeURIComponent(name)}`, data.predictions[name]);
   } else {
-    const ko = data.ko||{};
-    const koMatches = ko[currentPredictStage]||[];
+    const koMatches = currentPredictStage === 'r32' ? R32_MATCHES : (data.ko||{})[currentPredictStage]||[];
     if (!data.predictions[name].ko) data.predictions[name].ko = {};
     koMatches.forEach(m => {
-      const sel = document.getElementById('ko_'+m.id);
-      if (sel && sel.value) data.predictions[name].ko[m.id] = sel.value;
+      const h = parseInt(document.getElementById('koh'+m.id)?.value);
+      const a = parseInt(document.getElementById('koa'+m.id)?.value);
+      if (!isNaN(h) && !isNaN(a)) data.predictions[name].ko[m.id] = {h, a};
     });
     await savePatch(`data/predictions/${encodeURIComponent(name)}/ko`, data.predictions[name].ko);
   }
@@ -706,9 +731,9 @@ async function renderAdmin() {
     container.innerHTML = html;
   } else {
     const ko = data.ko||{};
-    const koMatches = ko[currentAdminStage]||[];
+    const koMatches = currentAdminStage === 'r32' ? R32_MATCHES : (ko[currentAdminStage]||[]);
     const koResults = data.koResults||{};
-    if (!koMatches.length) { container.innerHTML = '<div class="empty">Generate bracket from group stage first.</div>'; return; }
+    if (!koMatches.length) { container.innerHTML = '<div class="empty">Not yet available.</div>'; return; }
     let html = '';
     koMatches.forEach(m => {
       if (m.label) html += `<div class="section-label">${m.label}</div>`;
@@ -717,12 +742,10 @@ async function renderAdmin() {
       html += `<div class="card"><div class="admin-row">
         <div class="admin-teams">${m.home} vs ${m.away} <span style="font-size:11px;color:var(--text3)">${m.date}</span></div>
         <div class="admin-inputs" style="gap:8px">
-          ${isTbd ? '<span style="font-size:12px;color:var(--text3)">TBD — generate bracket first</span>' :
-          `<select id="kor_${m.id}" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:6px 10px;color:var(--text);font-size:13px;outline:none">
-            <option value="">Select winner</option>
-            <option value="${m.home}" ${res===m.home?'selected':''}>${m.home}</option>
-            <option value="${m.away}" ${res===m.away?'selected':''}>${m.away}</option>
-          </select>
+          ${isTbd ? '<span style="font-size:12px;color:var(--text3)">TBD</span>' :
+          `<input type="number" min="0" max="20" id="korh${m.id}" placeholder="0" value="${res&&res.h!==undefined?res.h:''}" style="width:44px;height:34px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:15px;text-align:center;outline:none">
+          <span style="color:var(--text3)">–</span>
+          <input type="number" min="0" max="20" id="kora${m.id}" placeholder="0" value="${res&&res.a!==undefined?res.a:''}" style="width:44px;height:34px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:15px;text-align:center;outline:none">
           <button class="save-btn" onclick="saveKOResult('${m.id}','${m.home}','${m.away}')">Save</button>
           <span class="saved-tag" id="kosaved_${m.id}" style="display:none">✓</span>`}
         </div>
@@ -779,21 +802,21 @@ function advanceWinner(data, id, winner, home, away) {
 
 // ===================== INIT =====================
 document.addEventListener('DOMContentLoaded', async () => {
-  // Restore saved name
-  const savedName = localStorage.getItem('wc_player_name');
   const ni = document.getElementById('player-name');
+  // Restore saved name FIRST before any rendering
+  const savedName = localStorage.getItem('wc_player_name');
   if (ni && savedName) {
     ni.value = savedName;
   }
-  // Force fresh data load then render
-  cachedData = null;
-  await renderPredictTabs();
   if (ni) {
     ni.addEventListener('blur', () => {
       localStorage.setItem('wc_player_name', ni.value.trim());
       renderMatches();
     });
   }
+  // Force fresh data load AFTER name is set
+  cachedData = null;
+  await renderPredictTabs();
   if (typeof twemoji !== 'undefined') twemoji.parse(document.body);
 });
 </script>
