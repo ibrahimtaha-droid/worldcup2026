@@ -770,12 +770,16 @@ async function saveKOResult(id, home, away) {
   const h = parseInt(document.getElementById('korh'+id)?.value);
   const a = parseInt(document.getElementById('kora'+id)?.value);
   if (isNaN(h)||isNaN(a)) { showToast('Enter valid scores', true); return; }
-  if (h === a) { showToast('No draws in knockout! One team must win', true); return; }
-  const winner = h > a ? home : away;
   const data = await loadData(true);
   if (!data.koResults) data.koResults = {};
-  data.koResults[id] = {h, a, winner};
-  advanceWinner(data, id, winner, home, away);
+  data.koResults[id] = {h, a};
+  // Only advance winner if not a draw (penalty winner can be set separately if needed)
+  if (h !== a) {
+    const winner = h > a ? home : away;
+    advanceWinner(data, id, winner, home, away);
+  } else {
+    showToast('Draw saved — remember to advance the penalty winner manually if needed', false);
+  }
   cachedData = null;
   await saveData(data);
   document.getElementById('kosaved_'+id).style.display='inline';
