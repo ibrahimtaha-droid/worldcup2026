@@ -770,22 +770,26 @@ async function saveKOResult(id, home, away) {
   const h = parseInt(document.getElementById('korh'+id)?.value);
   const a = parseInt(document.getElementById('kora'+id)?.value);
   if (isNaN(h)||isNaN(a)) { showToast('Enter valid scores', true); return; }
-  const data = await loadData(true);
-  if (!data.koResults) data.koResults = {};
-  data.koResults[id] = {h, a};
-  // Only advance winner if not a draw (penalty winner can be set separately if needed)
-  if (h !== a) {
-    const winner = h > a ? home : away;
-    advanceWinner(data, id, winner, home, away);
-  } else {
-    showToast('Draw saved — remember to advance the penalty winner manually if needed', false);
+  
+  // Save result directly via savePatch — no full data load needed
+  const result = {h, a};
+  const ok = await savePatch(`data/koResults/${id}`, result);
+  
+  if (ok) {
+    // Update cache
+    if (cachedData) {
+      if (!cachedData.koResults) cachedData.koResults = {};
+      cachedData.koResults[id] = result;
+    }
+    document.getElementById('kosaved_'+id).style.display='inline';
+    setTimeout(()=>document.getElementById('kosaved_'+id).style.display='none', 2500);
+    if (h === a) {
+      showToast('Draw saved ✓ — update next round manually for penalty winner');
+    } else {
+      showToast('Result saved! ✓');
+    }
+    renderAdmin();
   }
-  cachedData = null;
-  await saveData(data);
-  document.getElementById('kosaved_'+id).style.display='inline';
-  setTimeout(()=>document.getElementById('kosaved_'+id).style.display='none', 2500);
-  showToast('Result saved!');
-  renderAdmin();
 }
 
 function advanceWinner(data, id, winner, home, away) {
