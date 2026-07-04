@@ -265,6 +265,18 @@ const KO_STAGES = [
   { key:'final', label:'Final & 3rd place', date:'Jul 18–19', matches:2 },
 ];
 
+// R16 matches with Abu Dhabi kick-off times (ET + 8 hours)
+const R16_MATCHES = [
+  {id:'r16_1', home:'Canada', away:'Morocco', hf:'🇨🇦', af:'🇲🇦', date:'Jul 4', ko:'2026-07-04T21:00:00+04:00'},
+  {id:'r16_2', home:'Paraguay', away:'France', hf:'🇵🇾', af:'🇫🇷', date:'Jul 5', ko:'2026-07-05T01:00:00+04:00'},
+  {id:'r16_3', home:'Brazil', away:'Norway', hf:'🇧🇷', af:'🇳🇴', date:'Jul 5', ko:'2026-07-06T00:00:00+04:00'},
+  {id:'r16_4', home:'Mexico', away:'England', hf:'🇲🇽', af:'🏴󠁧󠁢󠁥󠁮󠁧󠁿', date:'Jul 6', ko:'2026-07-06T04:00:00+04:00'},
+  {id:'r16_5', home:'Portugal', away:'Spain', hf:'🇵🇹', af:'🇪🇸', date:'Jul 6', ko:'2026-07-06T23:00:00+04:00'},
+  {id:'r16_6', home:'USA', away:'Belgium', hf:'🇺🇸', af:'🇧🇪', date:'Jul 7', ko:'2026-07-07T01:00:00+04:00'},
+  {id:'r16_7', home:'Argentina', away:'Egypt', hf:'🇦🇷', af:'🇪🇬', date:'Jul 7', ko:'2026-07-07T20:00:00+04:00'},
+  {id:'r16_8', home:'Switzerland', away:'Colombia', hf:'🇨🇭', af:'🇨🇴', date:'Jul 8', ko:'2026-07-08T00:00:00+04:00'},
+];
+
 // R32 matches with Abu Dhabi kick-off times (ET + 8 hours)
 const R32_MATCHES = [
   {id:'r32_1', home:'South Africa', away:'Canada', hf:'🇿🇦', af:'🇨🇦', date:'Jun 28', ko:'2026-06-28T23:00:00+04:00'},
@@ -557,7 +569,7 @@ async function renderMatches() {
     container.innerHTML = html;
   } else {
     // For R32 use hardcoded matches, for later rounds use bracket from Firebase
-    const koMatches = currentPredictStage === 'r32' ? R32_MATCHES : (data.ko||{})[currentPredictStage]||[];
+    const koMatches = currentPredictStage === 'r32' ? R32_MATCHES : currentPredictStage === 'r16' ? R16_MATCHES : (data.ko||{})[currentPredictStage]||[];
     const koResults = data.koResults||{};
     const myKoPreds = myPreds.ko||{};
     if (!koMatches.length) { container.innerHTML = '<div class="empty">Bracket not yet available.</div>'; return; }
@@ -620,7 +632,7 @@ async function submitPredictions() {
     // Save only this player's predictions — no race condition!
     await savePatch(`data/predictions/${encodeURIComponent(name)}`, data.predictions[name]);
   } else {
-    const koMatches = currentPredictStage === 'r32' ? R32_MATCHES : (data.ko||{})[currentPredictStage]||[];
+    const koMatches = currentPredictStage === 'r32' ? R32_MATCHES : currentPredictStage === 'r16' ? R16_MATCHES : (data.ko||{})[currentPredictStage]||[];
     if (!data.predictions[name].ko) data.predictions[name].ko = {};
     koMatches.forEach(m => {
       const h = parseInt(document.getElementById('koh'+m.id)?.value);
@@ -731,7 +743,7 @@ async function renderAdmin() {
     container.innerHTML = html;
   } else {
     const ko = data.ko||{};
-    const koMatches = currentAdminStage === 'r32' ? R32_MATCHES : (ko[currentAdminStage]||[]);
+    const koMatches = currentAdminStage === 'r32' ? R32_MATCHES : currentAdminStage === 'r16' ? R16_MATCHES : (ko[currentAdminStage]||[]);
     const koResults = data.koResults||{};
     if (!koMatches.length) { container.innerHTML = '<div class="empty">Not yet available.</div>'; return; }
     let html = '';
