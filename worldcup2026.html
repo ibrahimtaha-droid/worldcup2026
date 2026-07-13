@@ -277,6 +277,12 @@ const R16_MATCHES = [
   {id:'r16_8', home:'Switzerland', away:'Colombia', hf:'🇨🇭', af:'🇨🇴', date:'Jul 8', ko:'2026-07-08T00:00:00+04:00'},
 ];
 
+// SF matches with Abu Dhabi kick-off times (ET + 8 hours)
+const SF_MATCHES = [
+  {id:'sf_1', home:'France', away:'Spain', hf:'🇫🇷', af:'🇪🇸', date:'Jul 14', ko:'2026-07-14T23:00:00+04:00'},
+  {id:'sf_2', home:'England', away:'Argentina', hf:'🏴󠁧󠁢󠁥󠁮󠁧󠁿', af:'🇦🇷', date:'Jul 15', ko:'2026-07-15T23:00:00+04:00'},
+];
+
 // QF matches with Abu Dhabi kick-off times (ET + 8 hours)
 const QF_MATCHES = [
   {id:'qf_1', home:'France', away:'Morocco', hf:'🇫🇷', af:'🇲🇦', date:'Jul 10', ko:'2026-07-10T00:00:00+04:00'},
@@ -577,7 +583,7 @@ async function renderMatches() {
     container.innerHTML = html;
   } else {
     // For R32 use hardcoded matches, for later rounds use bracket from Firebase
-    const koMatches = currentPredictStage === 'r32' ? R32_MATCHES : currentPredictStage === 'r16' ? R16_MATCHES : currentPredictStage === 'qf' ? QF_MATCHES : (data.ko||{})[currentPredictStage]||[];
+    const koMatches = currentPredictStage === 'r32' ? R32_MATCHES : currentPredictStage === 'r16' ? R16_MATCHES : currentPredictStage === 'qf' ? QF_MATCHES : currentPredictStage === 'sf' ? SF_MATCHES : (data.ko||{})[currentPredictStage]||[];
     const koResults = data.koResults||{};
     const myKoPreds = myPreds.ko||{};
     if (!koMatches.length) { container.innerHTML = '<div class="empty">Bracket not yet available.</div>'; return; }
@@ -640,7 +646,7 @@ async function submitPredictions() {
     // Save only this player's predictions — no race condition!
     await savePatch(`data/predictions/${encodeURIComponent(name)}`, data.predictions[name]);
   } else {
-    const koMatches = currentPredictStage === 'r32' ? R32_MATCHES : currentPredictStage === 'r16' ? R16_MATCHES : currentPredictStage === 'qf' ? QF_MATCHES : (data.ko||{})[currentPredictStage]||[];
+    const koMatches = currentPredictStage === 'r32' ? R32_MATCHES : currentPredictStage === 'r16' ? R16_MATCHES : currentPredictStage === 'qf' ? QF_MATCHES : currentPredictStage === 'sf' ? SF_MATCHES : (data.ko||{})[currentPredictStage]||[];
     if (!data.predictions[name].ko) data.predictions[name].ko = {};
     koMatches.forEach(m => {
       const h = parseInt(document.getElementById('koh'+m.id)?.value);
@@ -751,7 +757,7 @@ async function renderAdmin() {
     container.innerHTML = html;
   } else {
     const ko = data.ko||{};
-    const koMatches = currentAdminStage === 'r32' ? R32_MATCHES : currentAdminStage === 'r16' ? R16_MATCHES : currentAdminStage === 'qf' ? QF_MATCHES : (ko[currentAdminStage]||[]);
+    const koMatches = currentAdminStage === 'r32' ? R32_MATCHES : currentAdminStage === 'r16' ? R16_MATCHES : currentAdminStage === 'qf' ? QF_MATCHES : currentAdminStage === 'sf' ? SF_MATCHES : (ko[currentAdminStage]||[]);
     const koResults = data.koResults||{};
     if (!koMatches.length) { container.innerHTML = '<div class="empty">Not yet available.</div>'; return; }
     let html = '';
